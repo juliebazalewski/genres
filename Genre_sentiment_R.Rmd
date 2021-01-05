@@ -1,0 +1,112 @@
+---
+title: "Music Genre Sentiment Analysis--R Code"
+author: "Julie Bazalewski"
+date: "06/20/2020"
+output:
+  word_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+## Overview
+
+Analyze data from #countrymusic, #rockmusic, and #popmusic Twitter tags to determine if genre affects tweet sentiment.
+
+```{r include=FALSE}
+library(readr)
+library(dplyr)
+library(ggformula)
+```
+## Import .csv file
+
+```{r}
+tweet_df = read_csv("tweets_3147.csv", n_max = 3147)
+summary(tweet_df)
+```
+## Group by Genre and create boxplot
+
+```{r}
+gf_boxplot(sentiment ~ genre, data = tweet_df, fill=~genre)%>% 
+  gf_refine(scale_fill_manual(values = c("tomato2","cyan3", "sienna4")))
+```
+
+```{r}
+#look at histograms
+gf_histogram(~sentiment, data=tweet_df, fill="turquoise", color="black") %>% gf_facet_grid(genre~.)
+```
+## Calculate mean sentiment of each genre
+```{r}
+genreSentiment <- tweet_df %>% 
+  group_by(genre) %>%
+  summarise(genre.mean = mean(sentiment)) %>%
+  arrange(desc(genre.mean))
+
+genreSentiment
+```
+## Perform Chi Squared Test of Independence using sentiment as a categorial variable (negative, neutral, or positive)
+H0: There is no relationship between music genre and sentiment type
+H1: There is a relationship between music genre and sentiment type
+
+```{r}
+#turn sentiment into a categorical variable
+tweet_df <- tweet_df %>% 
+  mutate(sentiment_type = case_when(sentiment<0 ~"Negative", sentiment > 0 ~"Positive", TRUE ~"Netural"))
+
+#perform chi squared test
+chisq.test(tweet_df$genre, tweet_df$sentiment_type)
+```
+## Conclusion: 
+At the alpha = 0.05 significance level there is enough evidence to claim that there is an association between genre and sentiment.
+
+
+## Perform Kruskal-Wallis test as an alternative to ANOVA to check sentiment between groups with sentiment as a non-normal, numerical variable 
+H0: There is no relationship between music genre and sentiment
+H1: There is a relationship between music genre and sentiment
+
+```{r}
+kruskal.test(sentiment ~ genre, data = tweet_df)
+```
+## Conclusion: 
+At the alpha = 0.01 significance level there is enough evidence to claim that there is an association between genre and sentiment.
+
+## Perform T-Tests, the data is not normally distributed but the sample sizes are large. Use numerical sentiment data rather than categorical.
+```{r}
+country_sentiment = tweet_df$sentiment[which(tweet_df$genre == 'country')]
+rock_sentiment = tweet_df$sentiment[which(tweet_df$genre == 'rock')]
+pop_sentiment = tweet_df$sentiment[which(tweet_df$genre == 'pop')]
+
+t.test(country_sentiment,rock_sentiment, alternative="less")
+t.test(country_sentiment,rock_sentiment, alternative="greater")
+
+t.test(country_sentiment,pop_sentiment, alternative="less")
+t.test(country_sentiment,pop_sentiment, alternative="greater")
+
+t.test(rock_sentiment,pop_sentiment, alternative="less")
+t.test(rock_sentiment,pop_sentiment, alternative="greater")
+```
+##Conclusions:
+I looked at one-tail t-tests between each genre in both directions. I found that there is evidence at a significance level of alpha = 0.01 that the true sentiment of the pop tweets is greater than the sentiment of the rock tweets. I also found that there is evidence at a signficiance level of alpha = 0.05 that the true sentiment of the country tweets is greater than the sentiment of the rock tweets. I did not find evidence that the mean of the pop and country tweets differ significantly.
+
+#Summarize location data. Used to filter tweets in python code by finding large numbers of tweets from unexpected locations.
+```{r}
+country_locationCount <- tweet_df %>% 
+  filter(genre == "country") %>%
+  group_by(location) %>%
+  summarise(location.count = n()) %>%
+  arrange(desc(location.count))
+
+rock_locationCount <- tweet_df %>% 
+  filter(genre == "rock") %>%
+  group_by(location) %>%
+  summarise(location.count = n()) %>%
+  arrange(desc(location.count))
+
+pop_locationCount <- tweet_df %>% 
+  filter(genre == "pop") %>%
+  group_by(location) %>%
+  summarise(location.count = n()) %>%
+  arrange(desc(location.count))
+
+```
